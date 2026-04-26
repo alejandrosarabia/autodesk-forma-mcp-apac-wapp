@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "autodesk": {
+      "command": "node",
+      "args": ["src/index.js"]
+    }
+  }
+}

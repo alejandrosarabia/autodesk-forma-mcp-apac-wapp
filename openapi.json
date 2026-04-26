@@ -1,0 +1,1135 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Autodesk Construction Cloud MCP API",
+    "description": "REST wrapper around the Autodesk Construction Cloud MCP server. Every tool is exposed as a POST endpoint. Authenticate with the x-api-key header.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://YOUR-RAILWAY-APP.up.railway.app",
+      "description": "Railway deployment (replace with your actual Railway URL)"
+    }
+  ],
+  "security": [
+    { "ApiKeyAuth": [] }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "ToolResult": {
+        "type": "object",
+        "description": "JSON result returned by the tool"
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      },
+      "PermissionEntry": {
+        "type": "object",
+        "required": ["subjectId", "subjectType", "actions"],
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "description": "userId, roleId, or companyId"
+          },
+          "subjectType": {
+            "type": "string",
+            "enum": ["USER", "ROLE", "COMPANY"]
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["VIEW", "DOWNLOAD", "UPLOAD", "COLLABORATE", "CONTROL"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/check_auth_status": {
+      "post": {
+        "operationId": "check_auth_status",
+        "summary": "Check Autodesk authentication status",
+        "description": "Check the current Autodesk authentication status. Returns whether a valid 3LO token exists, when it expires, and whether a re-auth is needed before making API calls.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": {} }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Auth status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/start_auth_flow": {
+      "post": {
+        "operationId": "start_auth_flow",
+        "summary": "Start Autodesk OAuth browser authentication flow",
+        "description": "Start the Autodesk OAuth browser authentication flow. Returns a URL the user must open in their browser to log in.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": {} }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Auth flow started with URL", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_hubs": {
+      "post": {
+        "operationId": "get_hubs",
+        "summary": "Get all accessible Autodesk hubs",
+        "description": "Get all accessible Autodesk hubs (BIM 360 / ACC accounts).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": {} }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of hubs", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_projects": {
+      "post": {
+        "operationId": "get_projects",
+        "summary": "Get all projects within a hub",
+        "description": "Get all projects within a hub.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hubId"],
+                "properties": {
+                  "hubId": { "type": "string", "description": "Hub ID (from get_hubs)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of projects", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_top_folders": {
+      "post": {
+        "operationId": "get_top_folders",
+        "summary": "Get root-level folders for a project",
+        "description": "Get root-level folders for a project.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hubId", "projectId"],
+                "properties": {
+                  "hubId": { "type": "string", "description": "Hub ID (from get_hubs)" },
+                  "projectId": { "type": "string", "description": "Project ID (from get_projects)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of top-level folders", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_folder_contents": {
+      "post": {
+        "operationId": "get_folder_contents",
+        "summary": "List all files and subfolders inside a folder",
+        "description": "List all files and subfolders inside a folder (auto-paginated).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderId"],
+                "properties": {
+                  "projectId": { "type": "string", "description": "Project ID" },
+                  "folderId": { "type": "string", "description": "Folder URN/ID" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Folder contents", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_item_versions": {
+      "post": {
+        "operationId": "get_item_versions",
+        "summary": "Get version history for a file item",
+        "description": "Get version history for a file item.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "itemId"],
+                "properties": {
+                  "projectId": { "type": "string", "description": "Project ID" },
+                  "itemId": { "type": "string", "description": "Item URN/ID" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of versions", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/search_folder": {
+      "post": {
+        "operationId": "search_folder",
+        "summary": "Search for items by name within a folder",
+        "description": "Search for items by name within a folder.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderId", "query"],
+                "properties": {
+                  "projectId": { "type": "string", "description": "Project ID" },
+                  "folderId": { "type": "string", "description": "Folder URN/ID to search within" },
+                  "query": { "type": "string", "description": "Name substring to search for" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Matching items", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_issues": {
+      "post": {
+        "operationId": "list_issues",
+        "summary": "List issues in a project",
+        "description": "List issues in a project with optional filters.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId"],
+                "properties": {
+                  "projectId": { "type": "string", "description": "Project ID" },
+                  "status": { "type": "string", "enum": ["open", "closed", "draft", "void"], "description": "Filter by status" },
+                  "assignedTo": { "type": "string", "description": "Filter by assigned user ID" },
+                  "type": { "type": "string", "description": "Filter by issue type ID" },
+                  "limit": { "type": "number", "description": "Max results (default: all pages)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of issues", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_issue": {
+      "post": {
+        "operationId": "get_issue",
+        "summary": "Get a single issue by ID",
+        "description": "Get a single issue by ID.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "issueId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "issueId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Issue details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/create_issue": {
+      "post": {
+        "operationId": "create_issue",
+        "summary": "Create a new issue in a project",
+        "description": "Create a new issue in a project.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "title"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "title": { "type": "string", "description": "Issue title" },
+                  "description": { "type": "string" },
+                  "assignedTo": { "type": "string", "description": "User ID to assign the issue to" },
+                  "dueDate": { "type": "string", "description": "ISO 8601 date string" },
+                  "locationId": { "type": "string" },
+                  "issueTypeId": { "type": "string", "description": "Issue type ID (from list_issue_types)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created issue", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/update_issue": {
+      "post": {
+        "operationId": "update_issue",
+        "summary": "Update fields on an existing issue",
+        "description": "Update fields on an existing issue.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "issueId", "fields"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "issueId": { "type": "string" },
+                  "fields": {
+                    "type": "object",
+                    "description": "Fields to update: title, description, status, assignedTo, dueDate, locationId",
+                    "properties": {
+                      "title": { "type": "string" },
+                      "description": { "type": "string" },
+                      "status": { "type": "string" },
+                      "assignedTo": { "type": "string" },
+                      "dueDate": { "type": "string" },
+                      "locationId": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated issue", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_issue_comments": {
+      "post": {
+        "operationId": "list_issue_comments",
+        "summary": "List all comments on an issue",
+        "description": "List all comments on an issue.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "issueId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "issueId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of comments", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/add_issue_comment": {
+      "post": {
+        "operationId": "add_issue_comment",
+        "summary": "Add a comment to an issue",
+        "description": "Add a comment to an issue.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "issueId", "body"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "issueId": { "type": "string" },
+                  "body": { "type": "string", "description": "Comment text" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created comment", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_issue_types": {
+      "post": {
+        "operationId": "list_issue_types",
+        "summary": "List issue type templates for a project",
+        "description": "List issue type templates for a project (needed to get issueTypeId for create_issue).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId"],
+                "properties": {
+                  "projectId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of issue types", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_rfis": {
+      "post": {
+        "operationId": "list_rfis",
+        "summary": "List RFIs in a project",
+        "description": "List RFIs in a project with optional filters.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "status": { "type": "string", "description": "Filter by status (e.g. open, closed, draft, void)" },
+                  "assignedTo": { "type": "string", "description": "Filter by assigned user ID" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of RFIs", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_rfi": {
+      "post": {
+        "operationId": "get_rfi",
+        "summary": "Get a single RFI by ID",
+        "description": "Get a single RFI by ID.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "rfiId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "rfiId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "RFI details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/create_rfi": {
+      "post": {
+        "operationId": "create_rfi",
+        "summary": "Create a new RFI in a project",
+        "description": "Create a new RFI in a project.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "subject", "question"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "subject": { "type": "string", "description": "RFI subject line" },
+                  "question": { "type": "string", "description": "RFI question body" },
+                  "assignedTo": { "type": "string", "description": "User ID to assign the RFI to" },
+                  "dueDate": { "type": "string", "description": "ISO 8601 date string" },
+                  "costImpact": { "type": "string", "description": "Cost impact description" },
+                  "scheduleImpact": { "type": "string", "description": "Schedule impact description" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created RFI", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/update_rfi": {
+      "post": {
+        "operationId": "update_rfi",
+        "summary": "Update fields on an existing RFI",
+        "description": "Update fields on an existing RFI.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "rfiId", "fields"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "rfiId": { "type": "string" },
+                  "fields": {
+                    "type": "object",
+                    "description": "Fields to update: subject, question, status, assignedTo, dueDate, answer",
+                    "properties": {
+                      "subject": { "type": "string" },
+                      "question": { "type": "string" },
+                      "status": { "type": "string" },
+                      "assignedTo": { "type": "string" },
+                      "dueDate": { "type": "string" },
+                      "answer": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated RFI", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/add_rfi_comment": {
+      "post": {
+        "operationId": "add_rfi_comment",
+        "summary": "Add a comment to an RFI",
+        "description": "Add a comment to an RFI.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "rfiId", "body"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "rfiId": { "type": "string" },
+                  "body": { "type": "string", "description": "Comment text" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created comment", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_form_templates": {
+      "post": {
+        "operationId": "list_form_templates",
+        "summary": "List all form templates in a project",
+        "description": "List all form templates in a project (auto-paginated).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId"],
+                "properties": {
+                  "projectId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of form templates", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_form_template": {
+      "post": {
+        "operationId": "get_form_template",
+        "summary": "Get full details of a form template",
+        "description": "Get full details of a form template.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "templateId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "templateId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Form template details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_form_instances": {
+      "post": {
+        "operationId": "list_form_instances",
+        "summary": "List form instances with optional filters",
+        "description": "List form instances with optional filters by template or status.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "templateId": { "type": "string", "description": "Filter by form template ID" },
+                  "status": { "type": "string", "enum": ["draft", "submitted", "closed", "void"], "description": "Filter by instance status" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of form instances", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_form_instance": {
+      "post": {
+        "operationId": "get_form_instance",
+        "summary": "Get full details of a form instance",
+        "description": "Get full details of a form instance including all field values.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "formId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "formId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Form instance details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/create_form_instance": {
+      "post": {
+        "operationId": "create_form_instance",
+        "summary": "Create a new form instance from a template",
+        "description": "Create a new form instance from a template.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "templateId", "name"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "templateId": { "type": "string", "description": "Form template ID to base the instance on" },
+                  "name": { "type": "string", "description": "Name for this form instance" },
+                  "assignedTo": { "type": "string", "description": "User ID to assign to" },
+                  "dueDate": { "type": "string", "description": "ISO 8601 date string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created form instance", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/update_form_instance": {
+      "post": {
+        "operationId": "update_form_instance",
+        "summary": "Update status, assignee, or due date of a form instance",
+        "description": "Update status, assignee, or due date of a form instance.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "formId", "fields"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "formId": { "type": "string" },
+                  "fields": {
+                    "type": "object",
+                    "description": "Fields to update: status, assignedTo, dueDate",
+                    "properties": {
+                      "status": { "type": "string" },
+                      "assignedTo": { "type": "string" },
+                      "dueDate": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated form instance", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_project_users": {
+      "post": {
+        "operationId": "list_project_users",
+        "summary": "List all members of a project",
+        "description": "List all members of a project with their roles and access levels.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId", "projectId"],
+                "properties": {
+                  "accountId": { "type": "string", "description": "ACC Account ID (APS_ACCOUNT_ID)" },
+                  "projectId": { "type": "string", "description": "Project ID (without b. prefix)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of project members", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_project_user": {
+      "post": {
+        "operationId": "get_project_user",
+        "summary": "Get details for a single project member",
+        "description": "Get details for a single project member.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId", "projectId", "userId"],
+                "properties": {
+                  "accountId": { "type": "string" },
+                  "projectId": { "type": "string" },
+                  "userId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "User details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/add_project_user": {
+      "post": {
+        "operationId": "add_project_user",
+        "summary": "Add a user to a project by email",
+        "description": "Add a user to a project by email with a specified role.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId", "projectId", "email", "roleId"],
+                "properties": {
+                  "accountId": { "type": "string" },
+                  "projectId": { "type": "string" },
+                  "email": { "type": "string", "description": "Email address of the user to add" },
+                  "roleId": { "type": "string", "description": "Role ID (from list_roles)" },
+                  "companyId": { "type": "string", "description": "Company ID (optional)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Added user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/update_project_user_role": {
+      "post": {
+        "operationId": "update_project_user_role",
+        "summary": "Update a project member's role",
+        "description": "Update a project member's role.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId", "projectId", "userId", "roleId"],
+                "properties": {
+                  "accountId": { "type": "string" },
+                  "projectId": { "type": "string" },
+                  "userId": { "type": "string" },
+                  "roleId": { "type": "string", "description": "New role ID" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/remove_project_user": {
+      "post": {
+        "operationId": "remove_project_user",
+        "summary": "Remove a user from a project",
+        "description": "Remove a user from a project.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId", "projectId", "userId"],
+                "properties": {
+                  "accountId": { "type": "string" },
+                  "projectId": { "type": "string" },
+                  "userId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Removal confirmation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_roles": {
+      "post": {
+        "operationId": "list_roles",
+        "summary": "List all industry roles defined for a project",
+        "description": "List all industry roles defined for a project.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId", "projectId"],
+                "properties": {
+                  "accountId": { "type": "string" },
+                  "projectId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of roles", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/list_account_users": {
+      "post": {
+        "operationId": "list_account_users",
+        "summary": "List users in the account",
+        "description": "List users in the account (useful to look up userId before adding to a project).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountId"],
+                "properties": {
+                  "accountId": { "type": "string" },
+                  "email": { "type": "string", "description": "Filter by email (optional)" },
+                  "limit": { "type": "number", "description": "Max results to return (optional)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "List of account users", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_folder_permissions": {
+      "post": {
+        "operationId": "get_folder_permissions",
+        "summary": "Get all permission entries for a folder",
+        "description": "Get all permission entries for a folder (who has what access).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "folderId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Folder permissions", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/batch_create_folder_permissions": {
+      "post": {
+        "operationId": "batch_create_folder_permissions",
+        "summary": "Grant new permissions on a folder",
+        "description": "Grant new permissions on a folder for users, roles, or companies. actions: [\"VIEW\"] | [\"DOWNLOAD\"] | [\"UPLOAD\"] | [\"COLLABORATE\"] | [\"CONTROL\"]",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderId", "permissions"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "folderId": { "type": "string" },
+                  "permissions": {
+                    "type": "array",
+                    "description": "Array of permission objects",
+                    "items": { "$ref": "#/components/schemas/PermissionEntry" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Created permissions", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/batch_update_folder_permissions": {
+      "post": {
+        "operationId": "batch_update_folder_permissions",
+        "summary": "Update existing permission entries on a folder",
+        "description": "Update existing permission entries on a folder. Use this to change permission levels for already-added subjects.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderId", "permissions"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "folderId": { "type": "string" },
+                  "permissions": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/PermissionEntry" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated permissions", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/get_folder_permissions_recursive": {
+      "post": {
+        "operationId": "get_folder_permissions_recursive",
+        "summary": "Walk a folder tree and return permissions for every subfolder",
+        "description": "Walk a folder tree up to 3 levels deep and return permissions for every subfolder. Useful for auditing an entire folder tree at once.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "folderId": { "type": "string", "description": "Root folder to start from" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Recursive permission tree", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/audit_user_folder_access": {
+      "post": {
+        "operationId": "audit_user_folder_access",
+        "summary": "Show all folders a specific user has access to",
+        "description": "Show all folders a specific user has access to and what permission level they have.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hubId", "projectId", "userId"],
+                "properties": {
+                  "hubId": { "type": "string", "description": "Hub ID (needed to get top folders)" },
+                  "projectId": { "type": "string" },
+                  "userId": { "type": "string", "description": "User ID to audit" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "User folder access summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolResult" } } } },
+          "401": { "description": "Invalid or missing x-api-key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  }
+}

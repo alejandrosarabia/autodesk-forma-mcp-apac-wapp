@@ -1,0 +1,20 @@
+{
+  "name": "autodesk-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server for Autodesk Construction Cloud",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/http-server.js",
+    "start:local": "node src/index.js",
+    "start:cloud": "node src/http-server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "@modelcontextprotocol/sdk": "latest",
+    "dotenv": "^16.0.0",
+    "express": "^5.2.1",
+    "node-fetch": "^3.0.0",
+    "telegraf": "^4.16.3"
+  }
+}
