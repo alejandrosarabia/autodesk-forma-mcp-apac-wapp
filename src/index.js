@@ -186,6 +186,7 @@ import { sheetTools, handleSheetTool } from './tools/sheets.js';
 import { modelCoordinationTools, handleModelCoordinationTool } from './tools/model-coordination.js';
 import { modelPropertiesTools, handleModelPropertiesTool } from './tools/model-properties.js';
 import { autospecsTools, handleAutospecsTool } from './tools/autospecs.js';
+import { buildingConnectedTools, handleBuildingConnectedTool } from './tools/building-connected.js';
 import { authTools, handleAuthTool } from './tools/auth.js';
 import { startAuthServer } from './authServer.js';
 
@@ -213,6 +214,7 @@ const ALL_TOOLS = [
   ...modelCoordinationTools,
   ...modelPropertiesTools,
   ...autospecsTools,
+  ...buildingConnectedTools,
   ...permissionTools,
 ];
 
@@ -240,6 +242,7 @@ for (const tool of sheetTools)                 TOOL_HANDLERS.set(tool.name, (a) 
 for (const tool of modelCoordinationTools)     TOOL_HANDLERS.set(tool.name, (a) => handleModelCoordinationTool(tool.name, a));
 for (const tool of modelPropertiesTools)       TOOL_HANDLERS.set(tool.name, (a) => handleModelPropertiesTool(tool.name, a));
 for (const tool of autospecsTools)             TOOL_HANDLERS.set(tool.name, (a) => handleAutospecsTool(tool.name, a));
+for (const tool of buildingConnectedTools)     TOOL_HANDLERS.set(tool.name, (a) => handleBuildingConnectedTool(tool.name, a));
 for (const tool of permissionTools)            TOOL_HANDLERS.set(tool.name, (a) => handlePermissionTool(tool.name, a));
 
 // ─── MCP server setup ─────────────────────────────────────────────────────────

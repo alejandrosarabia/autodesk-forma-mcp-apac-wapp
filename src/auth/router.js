@@ -45,6 +45,7 @@ function requiresThreeLegged(method, path) {
   if (path.includes('/construction/rcm/')) return true;
   if (path.includes('/construction/packages/')) return true;
   if (path.includes('/construction/autospecs/')) return true;
+  if (path.includes('/construction/buildingconnected/')) return true;
   if (path.includes('/userprofile/')) return true;
 
   // Write operations on data/v1 items or folders — but NOT permission sub-endpoints
