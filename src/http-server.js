@@ -64,6 +64,7 @@ if (process.env.APS_3LO_TOKEN) {
 // Imported from api-server.js to avoid duplicating the registry definition.
 
 import { ALL_TOOLS, TOOL_HANDLERS, addApiRoutes } from './api-server.js';
+import { registerWhatsappRoutes } from './whatsapp/webhook.js';
 
 // ─── MCP server factory ───────────────────────────────────────────────────────
 // Creates a fresh Server per SSE connection so concurrent clients don't share
@@ -157,6 +158,10 @@ app.post('/message', async (req, res) => {
 
 addApiRoutes(app);
 
+// ─── WhatsApp Cloud API webhook ───────────────────────────────────────────────
+
+registerWhatsappRoutes(app);
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3002;
@@ -168,5 +173,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  GET  /health         health + auth check`);
   console.log(`  POST /api/:toolName  REST tool proxy    (ChatGPT)`);
   console.log(`  GET  /openapi.json   OpenAPI 3.0 spec`);
+  console.log(`  GET  /webhook/whatsapp  WhatsApp Cloud API verification`);
+  console.log(`  POST /webhook/whatsapp  WhatsApp Cloud API messages`);
   console.log(`  Tools loaded: ${ALL_TOOLS.length}`);
 });
