@@ -39,24 +39,26 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 // ─── Token bootstrap ──────────────────────────────────────────────────────────
-// Must match TOKEN_FILE in src/auth/threeLegged.js exactly so both modules
-// operate on the same file regardless of platform.
+// Must resolve to the same path as TOKEN_FILE in src/auth/threeLegged.js.
+// In production point APS_TOKEN_FILE at a persistent volume (e.g.
+// /data/.aps_3lo_token.json on Railway) so refresh_token rotations persist
+// across redeploys — otherwise every cold start overwrites the rotated token
+// with the stale APS_3LO_TOKEN env var and the refresh chain breaks.
 
-const TOKEN_FILE = join(process.cwd(), '.aps_3lo_token.json');
+const TOKEN_FILE = process.env.APS_TOKEN_FILE || join(process.cwd(), '.aps_3lo_token.json');
 
-if (process.env.APS_3LO_TOKEN) {
+if (existsSync(TOKEN_FILE)) {
+  console.log(`[boot] Using persisted token file: ${TOKEN_FILE}`);
+} else if (process.env.APS_3LO_TOKEN) {
   try {
-    // Validate JSON before writing so a malformed env var surfaces early
     JSON.parse(process.env.APS_3LO_TOKEN);
     writeFileSync(TOKEN_FILE, process.env.APS_3LO_TOKEN, 'utf8');
-    console.log('[boot] APS_3LO_TOKEN written to token file');
+    console.log(`[boot] Bootstrapped APS_3LO_TOKEN to ${TOKEN_FILE} (cold start)`);
   } catch (err) {
     console.error(`[boot] WARNING: APS_3LO_TOKEN is not valid JSON — ${err.message}`);
   }
-} else if (existsSync(TOKEN_FILE)) {
-  console.log('[boot] Using existing token file (local dev mode)');
 } else {
-  console.warn('[boot] WARNING: No APS_3LO_TOKEN env var and no token file found. ' +
+  console.warn(`[boot] WARNING: No token file at ${TOKEN_FILE} and no APS_3LO_TOKEN env var. ` +
     '3LO-authenticated tools will fail until a token is available.');
 }
 

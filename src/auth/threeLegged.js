@@ -25,7 +25,9 @@ const PROJECT_ROOT = join(__dirname, '..', '..');
 
 const AUTH_URL = 'https://developer.api.autodesk.com/authentication/v2/authorize';
 const TOKEN_URL = 'https://developer.api.autodesk.com/authentication/v2/token';
-const TOKEN_FILE = join(PROJECT_ROOT, '.aps_3lo_token.json');
+// In production set APS_TOKEN_FILE to a path on a persistent volume (e.g.
+// /data/.aps_3lo_token.json on Railway) so refreshed tokens survive redeploys.
+const TOKEN_FILE = process.env.APS_TOKEN_FILE || join(PROJECT_ROOT, '.aps_3lo_token.json');
 
 let tokenCache = null;
 
