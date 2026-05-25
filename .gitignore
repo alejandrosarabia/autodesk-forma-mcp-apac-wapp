@@ -3,3 +3,4 @@ node_modules/
 .aps_3lo_token.json
 token.json
 *.log
+.claude/
