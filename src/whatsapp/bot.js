@@ -150,6 +150,19 @@ function isAuthorized(from) {
   return ALLOWED_NUMBERS.has(from);
 }
 
+// Normalize WhatsApp's per-country quirks so the `from` we use everywhere
+// (whitelist, recipient of outbound replies) matches what Meta's outbound
+// whitelist accepts. Today we handle:
+//   • Mexico (52): WhatsApp prefixes mobiles with a historical "1" in webhooks
+//                  but Meta's "To" list stores them without it.
+//                  +5218119148454 (inbound) → +528119148454 (outbound)
+function normalizeWhatsappNumber(from) {
+  if (from.length === 13 && from.startsWith('521')) {
+    return '52' + from.slice(3);
+  }
+  return from;
+}
+
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -391,10 +404,10 @@ RESPONSE FORMAT — always follow this structure when reporting completed action
  *                            so future multi-number support is cheap.
  */
 export async function handleIncomingMessage(message, _metadata = {}) {
-  const from = message.from;
+  const from = normalizeWhatsappNumber(message.from);
 
   if (!isAuthorized(from)) {
-    console.log(`[whatsapp] ignoring message from unauthorized number: ${from}`);
+    console.log(`[whatsapp] ignoring message from unauthorized number: ${message.from} (normalized: ${from})`);
     return;
   }
 
