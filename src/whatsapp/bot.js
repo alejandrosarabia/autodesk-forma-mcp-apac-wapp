@@ -67,8 +67,9 @@ function sanitizeSchema(schema) {
 
 // ─── Tool categories for two-phase routing ────────────────────────────────────
 
+// NOTE: 'auth' is intentionally excluded — end users must never see auth URLs
+// or be asked to authenticate. Auth is managed by the server admin only.
 const TOOL_CATEGORIES = {
-  auth:              { tools: [...authTools],              handler: (n) => () => handleAuthTool(n) },
   projects:          { tools: [...projectTools],           handler: (n) => (a) => handleProjectTool(n, a) },
   documents:         { tools: [...documentTools],          handler: (n) => (a) => handleDocumentTool(n, a) },
   issues:            { tools: [...issueTools],             handler: (n) => (a) => handleIssueTool(n, a) },
@@ -268,6 +269,7 @@ RULES:
 - If a task involves creating/updating content in a project, ALWAYS include "projects" AND the relevant content category.
 - When in doubt, include more categories rather than fewer. Extra categories cost nothing.
 - For general greetings or questions not needing tools, pick no categories.
+- NEVER select "auth" — authentication is handled by the server admin, not end users.
 
 Available categories and their tools:
 ${CATEGORY_SUMMARY}`;
@@ -365,18 +367,32 @@ async function runAgentLoop(messages, selectedCategories, onToolCall, from) {
 
   console.log(`[phase2] ${tools.length} tools loaded from ${selectedCategories.length} categories`);
 
-  const systemPrompt = `You are an Autodesk Construction Cloud assistant connected to a live ACC environment with FULL access to all loaded tools. You CAN create, update, list, and manage everything that your available tools support — issues, RFIs, forms, submittals, assets, cost, and more. USE the tools provided to fulfill the user's request. Today is ${new Date().toISOString().split('T')[0]}.
+  const systemPrompt = `You are an Autodesk Construction Cloud field assistant operating over WhatsApp. You have FULL access to live ACC data through your tools. Today is ${new Date().toISOString().split('T')[0]}.
 
-Key project IDs:
-• Your Project: b.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+## GOLDEN RULES — never break these
 
-RESPONSE FORMAT — always follow this structure when reporting completed actions:
-1. Start with a status line: ✅ or ⚠️ + bold title (e.g. "✅ *Issue #84 Created — Wall Crack Defect*")
-2. Include a summary with key fields (ID, Category, Status, Description, dates, assignee, etc.)
-3. If a photo/file was attached, mention it with 📎
-4. End with a helpful follow-up suggestion (e.g. "Would you like to assign it or set a due date?")
-5. Use WhatsApp formatting: *bold* (single asterisks), _italic_, ~strikethrough~, and bullet points with •
-6. Be thorough and detailed — give the user a complete picture of what happened`;
+1. **NEVER ask the user for IDs, technical codes, or API values.** Always look them up yourself using the available tools (get_hubs → get_projects, list_issue_types, etc.).
+2. **NEVER ask the user for authentication or show auth URLs.** If there is an auth error, reply: "Hay un problema de configuración del sistema, por favor contacta al administrador."
+3. **ACT, don't ask.** If the user's intent is clear, execute immediately. Only ask for clarification when two equally valid interpretations exist and the choice truly matters.
+4. **Fill required fields automatically.** Use the first available issue type/subtype, status="open", published=true. Do not ask the user to choose a category unless they specified one.
+
+## WORKFLOW FOR CREATING AN ISSUE
+
+When the user asks to create an issue:
+1. Call get_hubs → get_projects to find the project (match by name if the user mentioned one, otherwise use the first/only project).
+2. Call list_issue_types to get the first available issueTypeId + issueSubtypeId.
+3. Call create_issue with: title (from user), issueSubtypeId (from step 2), status="open", published=true, and description if provided. Nothing else is required.
+4. If the user sent a photo in this conversation, attach it automatically using upload_photo_to_issue after creating the issue.
+5. Report the result — include the real issue ID from the API response.
+
+## RESPONSE FORMAT
+
+Always follow this structure:
+1. Status line: ✅ or ⚠️ + *bold title* (e.g. "✅ *Issue #84 Created — Falta pintura*")
+2. Key fields summary (ID, Project, Status, Description)
+3. 📎 if a photo was attached
+4. One short follow-up suggestion
+5. Use WhatsApp formatting: *bold*, _italic_, • bullets. Keep it concise.`;
 
   if (tools.length > 0) {
     tools[tools.length - 1].cache_control = { type: 'ephemeral' };
