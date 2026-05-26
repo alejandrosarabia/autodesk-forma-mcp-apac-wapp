@@ -290,6 +290,43 @@ ${CATEGORY_SUMMARY}`;
   return [];
 }
 
+// ─── History repair ───────────────────────────────────────────────────────────
+// If a previous turn threw mid-loop, the history may end with an orphaned
+// assistant(tool_use) + user(tool_result) pair that was never followed by an
+// assistant text response.  Sending that to Claude causes a 400 error on the
+// *next* user turn.  This function strips those trailing orphaned pairs so
+// every conversation always ends with a clean user or assistant text message.
+
+function repairHistory(messages) {
+  while (messages.length >= 2) {
+    const last = messages[messages.length - 1];
+    const prev = messages[messages.length - 2];
+
+    const lastHasToolResult = Array.isArray(last.content) &&
+      last.content.some(b => b.type === 'tool_result');
+    const prevHasToolUse = Array.isArray(prev.content) &&
+      prev.content.some(b => b.type === 'tool_use');
+
+    if (last.role === 'user' && lastHasToolResult &&
+        prev.role === 'assistant' && prevHasToolUse) {
+      console.warn('[history] Removing orphaned tool_use/tool_result pair from history');
+      messages.splice(messages.length - 2, 2);
+    } else {
+      break;
+    }
+  }
+  // Also remove a lone trailing assistant tool_use with no following tool_result
+  if (messages.length >= 1) {
+    const last = messages[messages.length - 1];
+    const lastHasToolUse = Array.isArray(last.content) &&
+      last.content.some(b => b.type === 'tool_use');
+    if (last.role === 'assistant' && lastHasToolUse) {
+      console.warn('[history] Removing lone trailing assistant tool_use from history');
+      messages.pop();
+    }
+  }
+}
+
 // ─── Phase 2: Agent loop with only the selected tools ────────────────────────
 
 async function runAgentLoop(messages, selectedCategories, onToolCall, from) {
@@ -345,14 +382,27 @@ RESPONSE FORMAT — always follow this structure when reporting completed action
     tools[tools.length - 1].cache_control = { type: 'ephemeral' };
   }
 
+  // Strip any orphaned tool_use/tool_result pairs left by a previous failed turn
+  repairHistory(messages);
+
   while (true) {
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
-      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-      messages,
-      tools: tools.length > 0 ? tools : undefined,
-    });
+    // Snapshot length so we can roll back if the continuation API call fails
+    const snapshotLen = messages.length;
+
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+        messages,
+        tools: tools.length > 0 ? tools : undefined,
+      });
+    } catch (err) {
+      // Roll back any messages pushed in this iteration before re-throwing
+      messages.splice(snapshotLen);
+      throw err;
+    }
 
     if (response.stop_reason === 'end_turn') return response;
 
@@ -441,9 +491,17 @@ async function handleTextMessage(from, body) {
 
   const categories = await routeMessage(body);
 
-  const response = await runAgentLoop(history, categories, async (toolName) => {
-    console.log(`[tool] ${toolName}`);
-  }, from);
+  let response;
+  try {
+    response = await runAgentLoop(history, categories, async (toolName) => {
+      console.log(`[tool] ${toolName}`);
+    }, from);
+  } catch (err) {
+    // Clear corrupted history so the next message starts fresh
+    console.error(`[whatsapp] runAgentLoop failed, clearing history for ${from}:`, err.message);
+    conversations.delete(from);
+    throw err;
+  }
 
   const text = response.content
     .filter(b => b.type === 'text')
