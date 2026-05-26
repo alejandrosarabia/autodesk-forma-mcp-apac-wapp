@@ -47,19 +47,43 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 
 const TOKEN_FILE = process.env.APS_TOKEN_FILE || join(process.cwd(), '.aps_3lo_token.json');
 
-if (existsSync(TOKEN_FILE)) {
-  console.log(`[boot] Using persisted token file: ${TOKEN_FILE}`);
+// Determine if the persisted file (if any) has a newer token than the env var.
+// Logic:
+//   1. If the file exists AND its expires_at is still valid (>60s) → use it as-is.
+//   2. If the file is expired OR missing AND APS_3LO_TOKEN env var is set →
+//      overwrite the file with the env var (operator injected a fresh token).
+//   3. If neither exists → warn and continue (auth will fail until token is provided).
+
+function getTokenExpiresAt(filePath) {
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf8'));
+    return typeof data.expires_at === 'number' ? data.expires_at : 0;
+  } catch {
+    return 0;
+  }
+}
+
+const fileExpiresAt = existsSync(TOKEN_FILE) ? getTokenExpiresAt(TOKEN_FILE) : 0;
+const fileIsValid   = fileExpiresAt > Date.now() + 60_000;
+
+if (fileIsValid) {
+  console.log(`[boot] Using persisted token file: ${TOKEN_FILE} (valid for ${Math.round((fileExpiresAt - Date.now()) / 60_000)}m)`);
 } else if (process.env.APS_3LO_TOKEN) {
   try {
-    JSON.parse(process.env.APS_3LO_TOKEN);
-    writeFileSync(TOKEN_FILE, process.env.APS_3LO_TOKEN, 'utf8');
-    console.log(`[boot] Bootstrapped APS_3LO_TOKEN to ${TOKEN_FILE} (cold start)`);
+    const envToken = JSON.parse(process.env.APS_3LO_TOKEN);
+    writeFileSync(TOKEN_FILE, JSON.stringify(envToken, null, 2), 'utf8');
+    const reason = fileExpiresAt > 0 ? 'persisted token expired' : 'no token file found';
+    console.log(`[boot] Wrote APS_3LO_TOKEN to ${TOKEN_FILE} (${reason})`);
   } catch (err) {
     console.error(`[boot] WARNING: APS_3LO_TOKEN is not valid JSON — ${err.message}`);
   }
+} else if (existsSync(TOKEN_FILE)) {
+  const expiredAgo = Math.round((Date.now() - fileExpiresAt) / 60_000);
+  console.warn(`[boot] WARNING: Persisted token at ${TOKEN_FILE} expired ${expiredAgo}m ago and no APS_3LO_TOKEN env var is set. ` +
+    'Visit /auth/start to re-authenticate.');
 } else {
   console.warn(`[boot] WARNING: No token file at ${TOKEN_FILE} and no APS_3LO_TOKEN env var. ` +
-    '3LO-authenticated tools will fail until a token is available.');
+    'Visit /auth/start to re-authenticate.');
 }
 
 // ─── Tool registry ────────────────────────────────────────────────────────────
