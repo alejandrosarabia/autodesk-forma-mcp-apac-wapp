@@ -67,6 +67,7 @@ if (existsSync(TOKEN_FILE)) {
 
 import { ALL_TOOLS, TOOL_HANDLERS, addApiRoutes } from './api-server.js';
 import { registerWhatsappRoutes } from './whatsapp/webhook.js';
+import { createCloudAuthSession, exchangeCloudAuthCode } from './auth/threeLegged.js';
 
 // ─── MCP server factory ───────────────────────────────────────────────────────
 // Creates a fresh Server per SSE connection so concurrent clients don't share
@@ -156,6 +157,56 @@ app.post('/message', async (req, res) => {
   await transport.handlePostMessage(req, res, req.body);
 });
 
+// ─── Cloud OAuth routes ───────────────────────────────────────────────────────
+// These allow re-authentication from Railway without needing localhost:3001.
+//
+// Setup (one-time):
+//   1. Set APS_CALLBACK_URL=https://<your-railway-app>.up.railway.app/auth/callback
+//      in Railway env vars AND in your APS app's registered callback URLs.
+//   2. To re-authenticate: visit https://<your-railway-app>.up.railway.app/auth/start
+//      and complete the browser login.
+
+app.get('/auth/start', (_req, res) => {
+  if (!process.env.APS_CALLBACK_URL || process.env.APS_CALLBACK_URL.includes('localhost')) {
+    return res.status(400).send(
+      '<h2>APS_CALLBACK_URL not configured for cloud use.</h2>' +
+      '<p>Set <code>APS_CALLBACK_URL=https://&lt;your-railway-app&gt;.up.railway.app/auth/callback</code> ' +
+      'in Railway environment variables and register it in your APS app settings.</p>',
+    );
+  }
+  try {
+    const { authUrl } = createCloudAuthSession();
+    res.redirect(authUrl);
+  } catch (err) {
+    res.status(500).send(`<h2>Failed to start auth flow</h2><pre>${err.message}</pre>`);
+  }
+});
+
+app.get('/auth/callback', async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+
+  if (error) {
+    return res.status(400).send(
+      `<h2 style="color:red">Authentication failed</h2><p>${error}: ${error_description || ''}</p>`,
+    );
+  }
+
+  if (!code || !state) {
+    return res.status(400).send('<h2>Missing code or state parameter</h2>');
+  }
+
+  try {
+    await exchangeCloudAuthCode(String(code), String(state));
+    res.send(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2em">
+      <h2 style="color:green">&#10003; Authentication successful!</h2>
+      <p>The Railway server is now authenticated with Autodesk. You can close this tab.</p>
+      <p><small>Token saved — no restart required.</small></p>
+    </body></html>`);
+  } catch (err) {
+    res.status(400).send(`<h2 style="color:red">Token exchange failed</h2><pre>${err.message}</pre>`);
+  }
+});
+
 // ─── REST API routes (ChatGPT Custom GPT) ─────────────────────────────────────
 
 addApiRoutes(app);
@@ -175,6 +226,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  GET  /health         health + auth check`);
   console.log(`  POST /api/:toolName  REST tool proxy    (ChatGPT)`);
   console.log(`  GET  /openapi.json   OpenAPI 3.0 spec`);
+  console.log(`  GET  /auth/start     start Autodesk OAuth flow (cloud re-auth)`);
+  console.log(`  GET  /auth/callback  OAuth redirect target (set as APS_CALLBACK_URL)`);
   console.log(`  GET  /webhook/whatsapp  WhatsApp Cloud API verification`);
   console.log(`  POST /webhook/whatsapp  WhatsApp Cloud API messages`);
   console.log(`  Tools loaded: ${ALL_TOOLS.length}`);

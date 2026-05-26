@@ -254,6 +254,116 @@ export async function startAuthFlow() {
   return { authUrl };
 }
 
+// ─── Cloud auth flow (Railway / hosted deployments) ───────────────────────────
+//
+// Unlike startAuthFlow() which listens on port 3001, the cloud flow uses the
+// app's own public URL as the redirect_uri so the OAuth callback arrives on
+// the Express server's /auth/callback route.
+//
+// Usage:
+//   1. GET /auth/start  → calls createCloudAuthSession(), redirects to Autodesk
+//   2. Autodesk redirects to APS_CALLBACK_URL (must end in /auth/callback)
+//   3. GET /auth/callback  → calls exchangeCloudAuthCode(), saves token to disk
+//
+// APS_CALLBACK_URL must be registered in the APS app settings AND set as an
+// env var on Railway (e.g. https://your-app.up.railway.app/auth/callback).
+
+/** In-memory store: state → { codeVerifier, expiresAt } — auto-expired after 10 min */
+const pendingStates = new Map();
+
+/**
+ * Builds the Autodesk authorization URL for the cloud OAuth flow.
+ * Does NOT start any local server — the callback will arrive on /auth/callback.
+ *
+ * @returns {{ authUrl: string, state: string }}
+ */
+export function createCloudAuthSession() {
+  const clientId = process.env.APS_CLIENT_ID;
+  const callbackUrl = process.env.APS_CALLBACK_URL;
+  const scopes = process.env.APS_SCOPES || 'data:read data:write data:create account:read account:write';
+
+  if (!clientId) throw new Error('APS_CLIENT_ID must be set in env');
+  if (!callbackUrl) throw new Error('APS_CALLBACK_URL must be set in env (e.g. https://your-app.up.railway.app/auth/callback)');
+
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = generateCodeChallenge(codeVerifier);
+  const state = crypto.randomBytes(16).toString('hex');
+
+  pendingStates.set(state, {
+    codeVerifier,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+
+  // Clean up expired states to avoid unbounded memory growth
+  for (const [s, v] of pendingStates) {
+    if (Date.now() > v.expiresAt) pendingStates.delete(s);
+  }
+
+  const authParams = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    scope: scopes,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
+
+  return { authUrl: `${AUTH_URL}?${authParams.toString()}`, state };
+}
+
+/**
+ * Exchanges the authorization code received at /auth/callback for a token.
+ * Validates the state parameter to prevent CSRF.
+ *
+ * @param {string} code   - Authorization code from Autodesk
+ * @param {string} state  - State value returned by Autodesk (must match what we sent)
+ * @returns {Promise<void>}  Throws on any error; token is saved to disk on success.
+ */
+export async function exchangeCloudAuthCode(code, state) {
+  const pending = pendingStates.get(state);
+  if (!pending) throw new Error('Unknown or expired OAuth state — please start the auth flow again');
+  if (Date.now() > pending.expiresAt) {
+    pendingStates.delete(state);
+    throw new Error('OAuth state expired (10-minute window) — please start the auth flow again');
+  }
+  pendingStates.delete(state);
+
+  const clientId = process.env.APS_CLIENT_ID;
+  const clientSecret = process.env.APS_CLIENT_SECRET;
+  const callbackUrl = process.env.APS_CALLBACK_URL;
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+  const tokenResponse = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: callbackUrl,
+      code_verifier: pending.codeVerifier,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error(`Token exchange failed: ${tokenResponse.status} ${await tokenResponse.text()}`);
+  }
+
+  const data = await tokenResponse.json();
+  const tokenData = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Date.now() + data.expires_in * 1000,
+  };
+
+  saveTokenToFile(tokenData);
+  tokenCache = tokenData;
+  console.error('✓ Cloud auth: token saved and in-memory cache updated.\n');
+}
+
 // ─── Public: start flow and wait for token (CLI) ──────────────────────────────
 
 /**
