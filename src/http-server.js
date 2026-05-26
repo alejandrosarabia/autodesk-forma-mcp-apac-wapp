@@ -91,7 +91,7 @@ if (fileIsValid) {
 
 import { ALL_TOOLS, TOOL_HANDLERS, addApiRoutes } from './api-server.js';
 import { registerWhatsappRoutes } from './whatsapp/webhook.js';
-import { createCloudAuthSession, exchangeCloudAuthCode } from './auth/threeLegged.js';
+import { createCloudAuthSession, exchangeCloudAuthCode, getThreeLeggedToken } from './auth/threeLegged.js';
 
 // ─── MCP server factory ───────────────────────────────────────────────────────
 // Creates a fresh Server per SSE connection so concurrent clients don't share
@@ -239,6 +239,24 @@ addApiRoutes(app);
 
 registerWhatsappRoutes(app);
 
+// ─── Token keep-alive ─────────────────────────────────────────────────────────
+// Autodesk invalidates a refresh token after ~14 days of inactivity. Calling
+// getThreeLeggedToken() periodically rotates the refresh token and resets the
+// inactivity timer, so the bot can run indefinitely after a single manual
+// authentication. The call is idempotent: if the cached access token is still
+// valid, no HTTP request is made.
+
+const KEEPALIVE_HOURS = Number(process.env.AUTH_KEEPALIVE_HOURS) || 12;
+
+async function keepaliveTick() {
+  try {
+    await getThreeLeggedToken();
+    console.log(`[keepalive] OK at ${new Date().toISOString()}`);
+  } catch (err) {
+    console.error(`[keepalive] FAILED — manual re-auth needed: ${err.message}`);
+  }
+}
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3002;
@@ -255,4 +273,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  GET  /webhook/whatsapp  WhatsApp Cloud API verification`);
   console.log(`  POST /webhook/whatsapp  WhatsApp Cloud API messages`);
   console.log(`  Tools loaded: ${ALL_TOOLS.length}`);
+  console.log(`  Keep-alive every ${KEEPALIVE_HOURS}h to prevent refresh-token expiry`);
 });
+
+setTimeout(keepaliveTick, 60_000);
+setInterval(keepaliveTick, KEEPALIVE_HOURS * 60 * 60 * 1000);
