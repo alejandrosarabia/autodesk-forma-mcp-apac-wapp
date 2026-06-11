@@ -5,6 +5,7 @@
  */
 
 import { apiRequest } from '../auth/router.js';
+import { paginate } from '../utils/paginate.js';
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
@@ -49,13 +50,17 @@ export async function handleProjectTool(name, args) {
 
     case 'get_projects': {
       const { hubId } = args;
-      const data = await apiRequest('GET', `/project/v1/hubs/${hubId}/projects`);
-      if (typeof data === 'string') return data;
-      return (data.data || []).map((p) => ({
-        id: p.id,
-        name: p.attributes?.name,
-        status: p.attributes?.status,
-      }));
+      return paginate(async (offset, limit) => {
+        const data = await apiRequest('GET',
+          `/project/v1/hubs/${hubId}/projects?page[number]=${offset}&page[limit]=${limit}`
+        );
+        if (typeof data === 'string') return [];
+        return (data.data || []).map((p) => ({
+          id: p.id,
+          name: p.attributes?.name,
+          status: p.attributes?.status,
+        }));
+      }, 100);
     }
 
     default:
