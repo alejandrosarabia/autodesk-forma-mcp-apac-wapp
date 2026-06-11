@@ -20,13 +20,17 @@ export const projectTools = [
   },
   {
     name: 'get_projects',
-    description: 'Get all projects within a hub',
+    description: 'Get all projects within a hub. When the user is looking for a specific project, ALWAYS pass nameFilter — hubs can have thousands of projects and returning them all is slow and gets truncated.',
     inputSchema: {
       type: 'object',
       properties: {
         hubId: {
           type: 'string',
           description: 'Hub ID (from get_hubs)',
+        },
+        nameFilter: {
+          type: 'string',
+          description: 'Optional case-insensitive substring to filter project names. Strongly recommended when searching for a specific project (e.g. "Alejandro" returns only projects whose name contains "Alejandro").',
         },
       },
       required: ['hubId'],
@@ -49,10 +53,13 @@ export async function handleProjectTool(name, args) {
     }
 
     case 'get_projects': {
-      const { hubId } = args;
-      return paginate(async (offset, limit) => {
+      const { hubId, nameFilter } = args;
+      const all = await paginate(async (offset, limit) => {
+        // Autodesk uses 0-based PAGE numbers, not offsets. paginate() advances
+        // offset by `limit` each call, so offset/limit gives the page number.
+        const pageNumber = offset / limit;
         const data = await apiRequest('GET',
-          `/project/v1/hubs/${hubId}/projects?page[number]=${offset}&page[limit]=${limit}`
+          `/project/v1/hubs/${hubId}/projects?page[number]=${pageNumber}&page[limit]=${limit}`
         );
         if (typeof data === 'string') return [];
         return (data.data || []).map((p) => ({
@@ -60,7 +67,13 @@ export async function handleProjectTool(name, args) {
           name: p.attributes?.name,
           status: p.attributes?.status,
         }));
-      }, 100);
+      }, 200); // 200 is the API's max page[limit]
+
+      if (nameFilter) {
+        const needle = nameFilter.toLowerCase();
+        return all.filter((p) => (p.name || '').toLowerCase().includes(needle));
+      }
+      return all;
     }
 
     default:
