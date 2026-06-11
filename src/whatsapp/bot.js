@@ -258,7 +258,24 @@ async function uploadPhotoToIssue(projectId, issueId, photoBuffer, displayName) 
 
 // ─── Phase 1: Route the user's message to the right tool categories ──────────
 
-async function routeMessage(userMessage) {
+async function routeMessage(userMessage, recentHistory = []) {
+  // Build a plain-text summary of recent turns (skip images and tool call blocks)
+  const historySummary = recentHistory
+    .filter(m => typeof m.content === 'string' ||
+      (Array.isArray(m.content) && m.content.some(b => b.type === 'text')))
+    .map(m => {
+      const role = m.role === 'user' ? 'Usuario' : 'Asistente';
+      const text = typeof m.content === 'string'
+        ? m.content
+        : m.content.filter(b => b.type === 'text').map(b => b.text).join(' ');
+      return `${role}: ${text.slice(0, 300)}`;
+    })
+    .join('\n');
+
+  const contextBlock = historySummary
+    ? `Contexto reciente de la conversación (úsalo para inferir la intención real aunque el mensaje actual sea ambiguo o incompleto):\n${historySummary}\n\n`
+    : '';
+
   const routerSystemPrompt = `You route user requests to the right Autodesk Construction Cloud tool categories.
 
 RULES:
@@ -278,7 +295,7 @@ ${CATEGORY_SUMMARY}`;
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 512,
     system: [{ type: 'text', text: routerSystemPrompt, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: userMessage }],
+    messages: [{ role: 'user', content: `${contextBlock}Mensaje actual: ${userMessage}` }],
     tools: [ROUTER_TOOL],
     tool_choice: { type: 'tool', name: 'select_tool_categories' },
   });
@@ -505,7 +522,7 @@ async function handleTextMessage(from, body) {
   const history = conversations.get(from);
   history.push({ role: 'user', content: body });
 
-  const categories = await routeMessage(body);
+  const categories = await routeMessage(body, history.slice(-12));
 
   let response;
   try {
@@ -582,7 +599,7 @@ async function handleImageMessage(from, message) {
     ],
   });
 
-  const categories = await routeMessage(caption);
+  const categories = await routeMessage(caption, history.slice(-12));
 
   const response = await runAgentLoop(history, categories, async (toolName) => {
     console.log(`[tool] ${toolName}`);
