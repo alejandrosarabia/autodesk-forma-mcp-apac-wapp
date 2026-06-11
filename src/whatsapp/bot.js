@@ -533,7 +533,14 @@ async function handleTextMessage(from, body) {
   }
 
   if (history.length > 20) {
-    conversations.set(from, history.slice(-20));
+    let sliced = history.slice(-20);
+    // Don't start on an orphaned tool_result — walk forward to the first clean user-text message
+    const firstClean = sliced.findIndex(m =>
+      m.role === 'user' &&
+      (typeof m.content === 'string' ||
+        (Array.isArray(m.content) && m.content.every(b => b.type !== 'tool_result')))
+    );
+    conversations.set(from, firstClean > 0 ? sliced.slice(firstClean) : sliced);
   }
 }
 
@@ -595,7 +602,14 @@ async function handleImageMessage(from, message) {
   }
 
   if (history.length > 20) {
-    conversations.set(from, history.slice(-20));
+    let sliced = history.slice(-20);
+    // Don't start on an orphaned tool_result — walk forward to the first clean user-text message
+    const firstClean = sliced.findIndex(m =>
+      m.role === 'user' &&
+      (typeof m.content === 'string' ||
+        (Array.isArray(m.content) && m.content.every(b => b.type !== 'tool_result')))
+    );
+    conversations.set(from, firstClean > 0 ? sliced.slice(firstClean) : sliced);
   }
 }
 
